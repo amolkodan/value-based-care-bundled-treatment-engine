@@ -1,12 +1,12 @@
 # VBC Bundled Treatment Platform (Open Source)
 
-Open-source technical foundation for building **Value-Based Care (VBC)** bundled payment engines using normalized **medical claims** and **pharmacy claims**. The platform includes a versioned **Bundled Treatment Package (Episode)** catalog, deterministic and explainable package assignment, weighted overlap allocation (one claim split across multiple packages), API/CLI execution paths, and analytics outputs suitable for contracting, actuarial review, and care management operations.
+Open-source technical foundation for building **Value-Based Care (VBC)** bundled payment engines using normalized **medical claims** and **pharmacy claims**. The platform includes a versioned **Bundled Treatment Package ** catalog, deterministic and explainable package assignment, weighted overlap allocation (one claim split across multiple packages), API/CLI execution paths, and analytics outputs suitable for contracting, actuarial review, and care management operations.
 
 This repository is designed as a serious starter for organizations implementing bundled treatment package payment models (for example, BPCI-like bundles, specialty package programs, payer-provider risk arrangements, and internal cost-accounting bundles).
 
 ## Clinical and Business Context
 
-In bundled payment models, a clinically-related set of services across a pre-defined care window (for example, index hospitalization + post-acute follow-up) is grouped into a **Bundled Treatment Package (Episode of Care)**. Financial accountability requires:
+In bundled payment models, a clinically-related set of services across a pre-defined care window (for example, index hospitalization + post-acute follow-up) is grouped into a **Bundled Treatment Package **. Financial accountability requires:
 
 - A robust mapping between raw claim activity and bundled treatment package definitions.
 - Support for medical and pharmacy cost integration.
@@ -156,9 +156,9 @@ Use `/docs` for interactive OpenAPI (Swagger UI).
 
 ## Healthcare Terminology Mapping
 
-- **Bundled Treatment Package (Episode of Care)**: Grouped clinical/financial services tied to an index event and a temporal window.
-- **Index Event**: Triggering claim event that opens an episode instance.
-- **Lookback/Lookforward Window**: Days before/after anchor date used for episode capture.
+- **Bundled Treatment Package **: Grouped clinical/financial services tied to an index event and a temporal window.
+- **Index Event**: Triggering claim event that opens an bundled-package instance.
+- **Lookback/Lookforward Window**: Days before/after anchor date used for bundled-package capture.
 - **Allowed Amount**: Payer-adjudicated allowed reimbursement amount.
 - **Paid Amount**: Actual paid amount after cost sharing and contract effects.
 - **PMPM**: Per Member Per Month total allowed cost normalized by covered lives.
