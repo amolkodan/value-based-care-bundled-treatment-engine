@@ -60,12 +60,15 @@ This dictionary summarizes the reference tables in `sql/schema/postgres.sql`.
 - rule_role: INDEX, INCLUSION, or EXCLUSION
 - code_system: ICD10, CPT, HCPCS, NDC
 - code_set_id or code_value: Exactly one per rule row
+- rule_weight / specificity_score: Weighted split scoring knobs for overlapping episodes
 - anchor_offset_days_pre / post: Episode window around anchor date
 
 ### vbc.member_episode_instance / vbc.claim_episode_assignment
 
 - Anchor date and window bounds for each triggered episode
 - claim_source: medical or pharmacy; links to claim_header or rx_claim_line
+- allocation_weight / allocation_pct: Normalized overlap allocation values
+- allocated_allowed_amount / allocated_paid_amount: Amounts split across matched bundles
 - match_explanation: JSON text for audit
 
 ## Value based care

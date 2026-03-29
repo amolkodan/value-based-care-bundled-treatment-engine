@@ -195,6 +195,8 @@ CREATE TABLE IF NOT EXISTS vbc.episode_rule (
   code_set_id TEXT REFERENCES vbc.code_set(code_set_id),
   code_value TEXT,
   match_operator TEXT NOT NULL DEFAULT 'EQUALS' CHECK (match_operator IN ('EQUALS', 'PREFIX')),
+  rule_weight NUMERIC(12,6) NOT NULL DEFAULT 1.0,
+  specificity_score NUMERIC(12,6) NOT NULL DEFAULT 1.0,
   CONSTRAINT episode_rule_code_chk CHECK (
     (code_set_id IS NOT NULL AND code_value IS NULL) OR (code_set_id IS NULL AND code_value IS NOT NULL)
   )
@@ -236,6 +238,12 @@ CREATE TABLE IF NOT EXISTS vbc.claim_episode_assignment (
   medical_claim_id TEXT REFERENCES vbc.claim_header(claim_id),
   rx_line_id BIGINT REFERENCES vbc.rx_claim_line(rx_line_id),
   rule_priority INTEGER,
+  matched_rule_id BIGINT REFERENCES vbc.episode_rule(rule_id),
+  allocation_run_id BIGINT,
+  allocation_weight NUMERIC(14,8),
+  allocation_pct NUMERIC(12,8),
+  allocated_allowed_amount NUMERIC(14,2),
+  allocated_paid_amount NUMERIC(14,2),
   match_explanation TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT claim_episode_one_claim_chk CHECK (
@@ -254,6 +262,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_claim_episode_assign_pharmacy
 
 CREATE INDEX IF NOT EXISTS idx_assignment_medical ON vbc.claim_episode_assignment (medical_claim_id);
 CREATE INDEX IF NOT EXISTS idx_assignment_rx ON vbc.claim_episode_assignment (rx_line_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_alloc_run ON vbc.claim_episode_assignment (allocation_run_id);
+
+-- Allocation run metadata for reproducibility and strategy versioning
+CREATE TABLE IF NOT EXISTS vbc.allocation_run (
+  allocation_run_id BIGSERIAL PRIMARY KEY,
+  strategy_name TEXT NOT NULL DEFAULT 'weighted_rules',
+  strategy_version TEXT NOT NULL DEFAULT '1.0',
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  note TEXT
+);
 
 -- ---------------------------------------------------------------------------
 -- ETL audit (idempotent loads)

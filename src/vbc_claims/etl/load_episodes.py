@@ -71,11 +71,17 @@ def load_episode_catalog(
         "code_set_id",
         "code_value",
         "match_operator",
+        "rule_weight",
+        "specificity_score",
     ]
     for c in rule_cols:
         if c not in rules.columns:
             if c == "match_operator":
                 rules[c] = "EQUALS"
+            elif c == "rule_weight":
+                rules[c] = 1.0
+            elif c == "specificity_score":
+                rules[c] = 1.0
             elif c in ("code_set_id", "code_value"):
                 rules[c] = pd.NA
             else:

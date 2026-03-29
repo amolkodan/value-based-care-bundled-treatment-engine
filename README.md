@@ -1,19 +1,94 @@
-# VBC Bundled Treatment Platform (open source)
+# VBC Bundled Treatment Platform
 
-Production-scaffold open-source platform for **value-based care (VBC) bundled episodes**: normalized **medical and pharmacy** claims in PostgreSQL, a **versioned episode catalog** (ICD-10 / CPT / HCPCS / NDC), **deterministic multi-episode assignment** (one claim can belong to multiple episodes), and reporting for **PMPM, risk, shared savings, and bundle spend**.
+Open-source technical foundation for building **Value-Based Care (VBC)** bundled payment engines using normalized **medical claims** and **pharmacy claims**. The platform includes a versioned episode catalog, deterministic and explainable episode assignment, weighted overlap allocation (one claim split across multiple episodes), API/CLI execution paths, and analytics outputs suitable for contracting, actuarial review, and care management operations.
 
-Use it to prototype bundled payment models, teach episode grouping, or fork into your own ingestion and orchestration stack.
+This repository is designed as a serious starter for organizations implementing episode-based payment models (for example, BPCI-like bundles, specialty episode programs, payer-provider risk arrangements, and internal cost-accounting bundles).
 
-## Features
+## Clinical and Business Context
 
-- **Core claims model**: members, eligibility, providers, professional/facility claims (`claim_header` / `claim_line` / `diagnosis`), and **pharmacy** (`rx_claim_header` / `rx_claim_line`).
-- **Episode catalog**: `episode_definition`, `episode_rule`, optional `code_set` / `code_set_member`, per-episode **anchor windows** (`episode_rule_window`).
-- **Assignment engine**: builds `member_episode_instance` from **INDEX** rules, assigns claims in `[anchor − pre, anchor + post]` with optional **INCLUSION** / **EXCLUSION** rules; persists `claim_episode_assignment` with JSON **match_explanation**.
-- **Synthetic + sample data**: CSV generator writes medical **and** pharmacy files; `data/sample/bundled/` ships a non-trivial multi-episode catalog (diabetes, CHF, TKA, cath lab, pharmacy carve-in).
-- **CLI & orchestration hooks**: Typer CLI (`vbc-claims`), plus `scripts/pipeline_tasks.py` for Airflow/Dagster-style task wrappers.
-- **Data quality**: `run_reconciliation_report()` for row counts and orphan line checks.
+In bundled payment models, a clinically-related set of services across a pre-defined care window (for example, index hospitalization + post-acute follow-up) is grouped into an **episode of care**. Financial accountability requires:
 
-## Quickstart
+- A robust mapping between raw claim activity and episode definitions.
+- Support for medical and pharmacy cost integration.
+- Explainable assignment and adjudication logic.
+- Allocation policy when a single claim is relevant to multiple conditions/bundles.
+
+This platform provides those core technical primitives while remaining implementation-neutral so payers, providers, MSOs, ACOs, TPAs, and analytics vendors can adapt it to local policy.
+
+## Core Capabilities
+
+- **Normalized claims domain model**
+  - Eligibility, members, providers, medical headers/lines/diagnoses, and pharmacy fills.
+  - SQL schema in `vbc` namespace for reproducible local/CI deployment.
+- **Episode catalog model**
+  - Episode metadata, rule catalog, code sets, and temporal windows.
+  - Supports ICD-10-CM/PCS context (diagnosis matching), CPT/HCPCS (professional/facility procedures), and NDC (drug exposures).
+- **Deterministic assignment engine**
+  - `INDEX` rules create anchor events.
+  - `INCLUSION`/`EXCLUSION` rules refine assignment.
+  - Multi-episode membership is native.
+- **Weighted overlap allocation**
+  - Claim overlap is split across matched bundles using rule-derived scoring.
+  - Stores `allocation_weight`, `allocation_pct`, and allocated dollar fields per assignment.
+- **Reporting and quality**
+  - PMPM and risk outputs preserved.
+  - Bundle reporting includes gross vs allocated spend and overlap diagnostics.
+  - Reconciliation checks for operational monitoring.
+- **Execution surfaces**
+  - CLI orchestration for local runs.
+  - FastAPI service endpoints for integration into enterprise systems.
+
+## Reference Architecture
+
+```mermaid
+flowchart LR
+  rawMed[RawMedicalClaims] --> normIngest[NormalizedIngestion]
+  rawRx[RawPharmacyClaims] --> normIngest
+  normIngest --> pg[(Postgres_vbc)]
+  catalog[EpisodeCatalogAndCodeSets] --> pg
+  pg --> assigner[DeterministicEpisodeAssigner]
+  assigner --> overlap[WeightedOverlapAllocator]
+  overlap --> assignTbl[claim_episode_assignment]
+  assignTbl --> reports[BundleAndFinanceReports]
+  assignTbl --> api[FastAPIService]
+```
+
+## Data Model Highlights
+
+Primary tables (see also `docs/data_dictionary.md`):
+
+- **Medical claims**
+  - `vbc.claim_header`, `vbc.claim_line`, `vbc.diagnosis`
+- **Pharmacy claims**
+  - `vbc.rx_claim_header`, `vbc.rx_claim_line`
+- **Episode catalog**
+  - `vbc.episode_definition`
+  - `vbc.episode_rule` (`rule_role`, `code_system`, `match_operator`, `rule_weight`, `specificity_score`)
+  - `vbc.episode_rule_window`
+  - `vbc.code_set`, `vbc.code_set_member`
+- **Assignment outputs**
+  - `vbc.member_episode_instance`
+  - `vbc.claim_episode_assignment`
+  - `vbc.allocation_run`
+
+### Weighted Split Logic (Technical)
+
+When a claim matches multiple episode instances, the engine computes a per-match score:
+
+`score = rule_weight * specificity_score * (1 + 1/rule_order)`
+
+Then for each unique claim key (`medical_claim_id` or `rx_line_id`):
+
+`allocation_pct_i = score_i / sum(score_all_matches_for_claim)`
+
+Allocated amounts are persisted:
+
+- `allocated_allowed_amount = base_allowed * allocation_pct`
+- `allocated_paid_amount = base_paid * allocation_pct`
+
+This produces deterministic, auditable, and financially reconcilable overlap handling.
+
+## Quickstart (Local)
 
 ```bash
 docker compose up -d
@@ -22,71 +97,128 @@ source .venv/bin/activate
 pip install -U pip
 pip install -e ".[dev]"
 
+# Initialize schema
 vbc-claims init-db
+
+# Generate synthetic normalized medical+pharmacy sample files
 vbc-claims generate-sample --rows 20000
+
+# End-to-end pipeline: load claims + load episode catalog + build member months + assign episodes + reconciliation
 vbc-claims run-pipeline --data-dir ./data/synthetic --bundled-dir ./data/sample/bundled
 
+# Operational outputs
 vbc-claims report --month 2025-12
 vbc-claims report-bundles --month 2025-12
 ```
 
-Or use the shell demo:
+Alternative:
 
 ```bash
 chmod +x scripts/run_bundled_pipeline.sh
 ./scripts/run_bundled_pipeline.sh
 ```
 
-### Environment
+## API Service
 
-- `DATABASE_URL` (default: `postgresql+psycopg2://vbc:vbc@localhost:5432/vbc_claims`)
-
-### Main CLI commands
-
-| Command | Purpose |
-|--------|---------|
-| `init-db` | Apply `sql/schema/postgres.sql` |
-| `generate-sample` | Write synthetic CSVs (medical + pharmacy) under `data/synthetic` |
-| `load-sample` | Truncate core tables and load CSVs from a directory |
-| `load-medical-claims` | Load normalized medical CSVs (`--header`, `--lines`, `--diagnosis`) |
-| `load-pharmacy-claims` | Load `rx_claim_header` / `rx_claim_line` CSVs |
-| `load-episodes` | Load episode catalog from `data/sample/bundled` (or `--catalog-dir`) |
-| `assign-episodes` | Run deterministic episode assignment |
-| `run-pipeline` | Load sample + episode catalog + member-months + assign + reconciliation |
-| `build-member-months` | Derive `vbc.member_month` |
-| `report` | PMPM, risk, optional shared savings |
-| `report-bundles` | Episode instance counts and spend rollups |
-
-## Repository layout
-
-- `src/vbc_claims` — Python package (ETL, episodes engine, measures, contracts, quality)
-- `sql/schema` — Postgres DDL (`vbc` schema)
-- `sql/queries` — Example analytic SQL
-- `data/synthetic` — Default output for `generate-sample`
-- `data/sample/bundled` — Episode definitions, rules, code sets (CSV)
-- `docs` — Architecture, data dictionary, episode modeling
-- `scripts` — Demo pipeline shell script and orchestration task stubs
-
-## Documentation
-
-- [docs/architecture.md](docs/architecture.md) — End-to-end design and deployment notes
-- [docs/episodes.md](docs/episodes.md) — Episode rules, windows, and assignment semantics
-- [docs/data_dictionary.md](docs/data_dictionary.md) — Table reference
-
-## Integration tests
-
-CI runs Postgres and sets `RUN_INTEGRATION=1` so the full pipeline test executes. Locally:
+Start service:
 
 ```bash
-export RUN_INTEGRATION=1
-docker compose up -d
-pytest -q
+vbc-claims-api
 ```
 
-## Data protection
+Or via compose (`api` service included in `docker-compose.yml`).
 
-All bundled sample and synthetic data are **fabricated for demonstration**. Do not commit PHI. Use your org’s secrets and access controls for production.
+Key endpoints:
+
+- `GET /health`
+- `GET /episodes/catalog`
+- `POST /episodes/assign/run`
+- `GET /episodes/assignments`
+- `GET /reports/bundles?month=YYYY-MM`
+
+Use `/docs` for interactive OpenAPI (Swagger UI).
+
+## CLI Commands (Operational)
+
+| Command | Purpose |
+|---|---|
+| `init-db` | Apply DDL from `sql/schema/postgres.sql` |
+| `generate-sample` | Generate synthetic medical + pharmacy claim data |
+| `load-sample` | Truncate/reload core sample tables |
+| `load-medical-claims` | Load normalized medical files |
+| `load-pharmacy-claims` | Load normalized pharmacy files |
+| `load-episodes` | Load episode catalog and code sets |
+| `assign-episodes` | Build episode instances and claim assignments |
+| `run-pipeline` | Execute integrated reference pipeline |
+| `build-member-months` | Build member-month denominator table |
+| `report` | PMPM/risk/shared savings outputs |
+| `report-bundles` | Episode-level gross + allocated spend outputs |
+
+## Healthcare Terminology Mapping
+
+- **Episode of Care**: Grouped clinical/financial services tied to an index event and a temporal window.
+- **Index Event**: Triggering claim event that opens an episode instance.
+- **Lookback/Lookforward Window**: Days before/after anchor date used for episode capture.
+- **Allowed Amount**: Payer-adjudicated allowed reimbursement amount.
+- **Paid Amount**: Actual paid amount after cost sharing and contract effects.
+- **PMPM**: Per Member Per Month total allowed cost normalized by covered lives.
+- **Attribution**: Assignment of members to accountable providers/entities.
+- **NDC**: National Drug Code for pharmacy products.
+- **HCPCS/CPT**: Procedure coding systems used for professional/facility services.
+- **ICD-10**: Diagnosis/procedure classification used for clinical condition grouping.
+
+## Repository Structure
+
+- `src/vbc_claims/`
+  - `etl/` ingestion, catalog loading, pipeline orchestration
+  - `episodes/` assignment and overlap allocation engine
+  - `measures/` bundle and cost measures
+  - `analytics/` report composition layer
+  - `api/` FastAPI service module
+  - `quality/` reconciliation checks
+- `sql/schema/` PostgreSQL schema
+- `data/sample/bundled/` episode definitions + rules + code sets
+- `data/synthetic/` generated synthetic datasets
+- `docs/` architecture, episode semantics, data dictionary
+- `scripts/` runnable demo and orchestration stubs
+
+## Configuration
+
+- `DATABASE_URL` (default `postgresql+psycopg2://vbc:vbc@localhost:5432/vbc_claims`)
+
+For production forks, add:
+
+- secrets manager integration,
+- API authN/authZ,
+- PHI-safe structured logging/redaction,
+- tenant-aware data partitioning and access controls.
+
+## Testing and CI
+
+- Lint: `ruff check src tests`
+- Type checks: `mypy src`
+- Unit/integration: `pytest -q`
+
+CI runs PostgreSQL service and enables integration mode with `RUN_INTEGRATION=1`.
+
+## Productionization Guidance
+
+Recommended hardening for enterprise use:
+
+- Version-lock episode catalogs with formal release governance.
+- Implement validation contracts for inbound claim feeds (schema, domain, and conformance checks).
+- Add policy modules for payer/program-specific overlap allocation and precedence.
+- Add reconciliation packs for:
+  - institutional vs professional claim balance checks,
+  - pharmacy rebate adjustment extensions,
+  - episode-level financial conservation assertions.
+- Add deployment artifacts for Kubernetes, ingress policy, and workload identity.
+- Add RBAC and auditing for catalog/rule changes and assignment reruns.
+
+## Data Privacy and Compliance Notice
+
+Included datasets are synthetic and de-identified for demonstration only. Do not commit PHI. This project is a technical framework and does not itself establish HIPAA compliance, coding accuracy certification, or payer program compliance; implement organizational controls and validation before production use.
 
 ## License
 
-Apache-2.0 (see `pyproject.toml`).
+Apache-2.0.
