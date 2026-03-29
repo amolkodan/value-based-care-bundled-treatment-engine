@@ -70,5 +70,6 @@ def compute_shared_savings(contract_id: str, performance_year: int) -> pd.DataFr
         """
     )
 
+    params: dict[str, str | int] = {"contract_id": contract_id, "performance_year": performance_year}
     with db_connection() as conn:
-        return pd.read_sql(sql, conn, params={"contract_id": contract_id, "performance_year": performance_year})
+        return pd.read_sql(sql, conn, params=params)

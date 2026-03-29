@@ -39,12 +39,34 @@ This dictionary summarizes the reference tables in `sql/schema/postgres.sql`.
 - claim_line_id: Unique line identifier
 - claim_id: References vbc.claim_header
 - line_number: Line number
-- procedure_code, modifier1, modifier2: Procedure and modifiers
-- ndc: NDC for pharmacy
+- hcpcs: Procedure code (CPT/HCPCS)
+- modifier: Procedure modifier
 - units: Units
 - allowed_amount: Allowed amount
 - paid_amount: Paid amount
 - charge_amount: Charge amount
+
+### vbc.rx_claim_header / vbc.rx_claim_line
+
+- rx_claim_id: Pharmacy claim identifier
+- fill_date: Date of fill
+- days_supply: Days supply
+- ndc11: 11-digit NDC (normalized without dashes in assignment logic)
+- allowed_amount / paid_amount / ingredient_cost: Financial fields
+
+### vbc.episode_definition / vbc.episode_rule / vbc.episode_rule_window
+
+- episode_id: Bundle / episode catalog key
+- rule_role: INDEX, INCLUSION, or EXCLUSION
+- code_system: ICD10, CPT, HCPCS, NDC
+- code_set_id or code_value: Exactly one per rule row
+- anchor_offset_days_pre / post: Episode window around anchor date
+
+### vbc.member_episode_instance / vbc.claim_episode_assignment
+
+- Anchor date and window bounds for each triggered episode
+- claim_source: medical or pharmacy; links to claim_header or rx_claim_line
+- match_explanation: JSON text for audit
 
 ## Value based care
 

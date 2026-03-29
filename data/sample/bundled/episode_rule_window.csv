@@ -1,0 +1,6 @@
+episode_id,anchor_offset_days_pre,anchor_offset_days_post
+EP_DM,0,180
+EP_CHF,0,120
+EP_TKA,30,365
+EP_CATH,0,90
+EP_DM_PHARM,0,180

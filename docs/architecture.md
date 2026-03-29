@@ -2,30 +2,52 @@
 
 ## Objectives
 
-- Standardize medical claims data into a consistent analytic model
-- Support attribution and contract configuration for multiple value based care programs
-- Produce reproducible performance reporting with audit friendly lineage
+- Standardize **medical and pharmacy** claims into a consistent analytic model in PostgreSQL (`vbc` schema).
+- Support **bundled / episodic** programs via a **catalog-driven** rule engine with **multi-episode assignment** and explainable outputs.
+- Support attribution, contracts, and legacy **PMPM / risk / shared savings** reporting alongside bundle rollups.
+- Provide **orchestration-friendly** entrypoints, validation, and reconciliation suitable for a production data platform fork.
 
 ## Reference workflow
 
-1. Land raw eligibility, provider, and claims extracts in a file store
-2. Load standardized tables in Postgres schema vbc
-3. Generate member months and attribution spans
-4. Run reporting jobs for cost, utilization, quality, risk, and contract performance
+1. Land raw eligibility, provider, medical, and pharmacy extracts (CSV, SFTP, lake objects).
+2. Load **normalized** tables in Postgres (`claim_*`, `rx_*`, `member`, etc.).
+3. Load **episode catalog** (`episode_definition`, `episode_rule`, `code_set*`, `episode_rule_window`).
+4. Run `assign-episodes` to create `member_episode_instance` and `claim_episode_assignment`.
+5. Build derived tables (e.g. `member_month`) and run reporting: PMPM, risk, contracts, **bundle spend** (`report-bundles`).
+6. In production: add orchestration (Airflow / Dagster / Prefect), data quality gates, and environment-specific secrets.
+
+```mermaid
+flowchart LR
+  rawFiles[RawEligibilityClaimsRx] --> ingest[NormalizedIngestion]
+  ingest --> pg[(Postgres_vbc)]
+  catalog[EpisodeCatalogCSVs] --> pg
+  pg --> engine[EpisodeAssignmentEngine]
+  engine --> instances[member_episode_instance]
+  engine --> assigns[claim_episode_assignment]
+  assigns --> reports[AnalyticsAndBundleReports]
+```
 
 ## Modules
 
-- vbc_claims.io: database and file I O utilities
-- vbc_claims.etl: loaders and validators
-- vbc_claims.transforms: normalization and derived tables
-- vbc_claims.measures: quality and utilization measures
-- vbc_claims.contracts: benchmark and shared savings calculations
+| Module | Purpose |
+|--------|---------|
+| `vbc_claims.io` | SQLAlchemy engine and SQL file execution |
+| `vbc_claims.etl` | Loaders, synthetic generator, validators, `run_full_pipeline` |
+| `vbc_claims.episodes` | Deterministic INDEX / window / inclusion / exclusion assignment |
+| `vbc_claims.transforms` | Derived tables (member months) |
+| `vbc_claims.measures` | PMPM, bundle spend rollups |
+| `vbc_claims.contracts` | Benchmarks and shared savings |
+| `vbc_claims.analytics` | Composed reporting |
+| `vbc_claims.quality` | Reconciliation and DQ hooks |
 
 ## Deployment notes
 
-This starter repository uses Postgres for demonstration. In production, typical patterns include:
+This repository uses **Postgres 16** in Docker Compose for local development. Typical production patterns:
 
-- A lakehouse for raw storage
-- A warehouse for curated star schema
-- Orchestration with Airflow, Dagster, or Prefect
-- Observability with data quality checks, row count and cost drift, and contract reconciliation
+- **Lakehouse** or object store for immutable raw feeds
+- **Warehouse** or Postgres for curated analytic schemas
+- **Orchestration** with Airflow, Dagster, or Prefect (`scripts/pipeline_tasks.py` as stubs)
+- **Observability**: reconciliation reports, row counts, cost drift vs benchmarks, episode instance volume alerts
+- **Governance**: PHI segregation, RBAC, audit trails for catalog changes (not included here—add in your fork)
+
+See [episodes.md](episodes.md) for episode semantics and [data_dictionary.md](data_dictionary.md) for table-level detail.

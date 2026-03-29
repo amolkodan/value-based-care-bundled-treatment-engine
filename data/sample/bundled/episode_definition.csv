@@ -1,0 +1,6 @@
+episode_id,display_name,clinical_domain,bundle_type,model_version,effective_start,effective_end,description
+EP_DM,Type 2 diabetes population bundle,Endocrine,episodic,1.0.0,2025-01-01,,Anchor on T2DM diagnosis; window captures medical and pharmacy spend.
+EP_CHF,Heart failure episode,Cardiology,episodic,1.0.0,2025-01-01,,Anchor on heart failure diagnosis; overlapping with diabetes is possible in multi-morbid members.
+EP_TKA,Total knee arthroplasty bundle,MSK,episodic,1.0.0,2025-01-01,,Procedure-anchored bundle with pre/post acute window.
+EP_CATH,Cardiac catheterization episode,Cardiology,episodic,1.0.0,2025-01-01,,CPT-anchored invasive cardiology episode.
+EP_DM_PHARM,Diabetes pharmacy-attributed carve-in,Endocrine,pharmacy_carve_in,1.0.0,2025-01-01,,Requires diabetes anchor plus diabetes-related NDC on a fill (overlaps EP_DM for RX rows).

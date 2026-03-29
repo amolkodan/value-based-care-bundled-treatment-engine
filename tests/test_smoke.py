@@ -10,3 +10,5 @@ def test_generate_synthetic_dataset(tmp_path: Path) -> None:
     assert paths.member_csv.exists()
     assert paths.claim_header_csv.exists()
     assert paths.claim_line_csv.exists()
+    assert paths.rx_claim_header_csv.exists()
+    assert paths.rx_claim_line_csv.exists()

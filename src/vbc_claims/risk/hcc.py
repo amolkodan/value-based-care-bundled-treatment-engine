@@ -48,5 +48,5 @@ def compute_member_simple_risk_scores(performance_year: int) -> pd.DataFrame:
     df = df.dropna(subset=["hcc_code"])
     df["weight"] = df["hcc_code"].map(HCC_WEIGHT).fillna(0.0)
 
-    risk = df.groupby("member_id", as_index=False)["weight"].sum().rename(columns={"weight": "risk_score"})
+    risk = df.groupby("member_id", as_index=False).agg(risk_score=("weight", "sum"))
     return risk

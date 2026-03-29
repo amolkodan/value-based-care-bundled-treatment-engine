@@ -6,6 +6,8 @@ from datetime import date
 import pandas as pd
 
 from vbc_claims.contracts.shared_savings import compute_shared_savings
+from vbc_claims.episodes.engine import episode_summary_by_episode
+from vbc_claims.measures.bundles import compute_episode_spend_in_period
 from vbc_claims.measures.cost import compute_pmpm
 from vbc_claims.risk.hcc import compute_member_simple_risk_scores
 
@@ -15,6 +17,12 @@ class PerformanceReport:
     pmpm: pd.DataFrame
     risk: pd.DataFrame
     shared_savings: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class BundleEpisodeReport:
+    episode_catalog_summary: pd.DataFrame
+    episode_spend: pd.DataFrame
 
 
 def build_performance_report(month_start: date, month_end: date, contract_id: str | None = None) -> PerformanceReport:
@@ -29,3 +37,9 @@ def build_performance_report(month_start: date, month_end: date, contract_id: st
         shared_df = compute_shared_savings(contract_id, performance_year)
 
     return PerformanceReport(pmpm=pmpm_df, risk=risk_df, shared_savings=shared_df)
+
+
+def build_bundle_episode_report(month_start: date, month_end: date) -> BundleEpisodeReport:
+    summary = episode_summary_by_episode()
+    spend = compute_episode_spend_in_period(month_start, month_end)
+    return BundleEpisodeReport(episode_catalog_summary=summary, episode_spend=spend)
