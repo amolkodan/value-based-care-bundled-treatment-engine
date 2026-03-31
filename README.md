@@ -220,5 +220,5 @@ Recommended hardening for enterprise use:
 Included datasets are synthetic and de-identified for demonstration only. Do not commit PHI. This project is a technical framework and does not itself establish HIPAA compliance, coding accuracy certification, or payer program compliance; implement organizational controls and validation before production use.
 
 ## License
-
+MIT
 Apache-2.0.
