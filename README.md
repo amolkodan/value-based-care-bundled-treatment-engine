@@ -221,4 +221,5 @@ Included datasets are synthetic and de-identified for demonstration only. Do not
 
 ## License
 MIT
-Apache-2.0.
+
+Apache-2.0
