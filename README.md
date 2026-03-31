@@ -138,6 +138,32 @@ Key endpoints:
 
 Use `/docs` for interactive OpenAPI (Swagger UI).
 
+## Deploy on AWS
+
+This repository now includes an AWS-first deployable foundation:
+
+- Terraform baseline in `infra/aws/terraform/` for VPC, ECS/Fargate, RDS, ALB, S3, IAM, and CloudWatch.
+- Environment overlays in `infra/aws/terraform/env/{dev,stage,prod}.tfvars`.
+- CI/CD workflows:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/deploy-aws.yml`
+- Runtime hardening:
+  - `Dockerfile` (non-root, healthcheck)
+  - `scripts/container_entrypoint.sh` (deterministic init path)
+
+See:
+
+- `docs/deployment_aws.md` for deployment runbook
+- `docs/operations.md` for operations and rollback
+- `docs/security_baseline.md` for security posture
+
+### CI/CD Behavior (Important)
+
+- Pushes and pull requests run **CI checks** (`.github/workflows/ci.yml`) for lint/type/test.
+- AWS deployment is **manual by default** via `.github/workflows/deploy-aws.yml` using `workflow_dispatch`.
+- A regular `git push` does **not** automatically deploy infrastructure or application workloads.
+- Deployment occurs only when you explicitly trigger the deploy workflow and provide environment/image inputs.
+
 ## CLI Commands (Operational)
 
 | Command | Purpose |

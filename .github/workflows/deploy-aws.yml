@@ -1,0 +1,73 @@
+name: deploy-aws
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev/stage/prod)"
+        required: true
+        default: "dev"
+      image_tag:
+        description: "Docker image tag"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push image
+        env:
+          ECR_REPO: ${{ secrets.AWS_ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          docker build -t "$ECR_REPO:$IMAGE_TAG" .
+          docker push "$ECR_REPO:$IMAGE_TAG"
+
+  terraform-plan-and-apply:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Terraform init
+        working-directory: infra/aws/terraform
+        run: terraform init
+      - name: Terraform validate
+        working-directory: infra/aws/terraform
+        run: terraform validate
+      - name: Terraform plan
+        working-directory: infra/aws/terraform
+        run: |
+          terraform plan \
+            -var-file="env/${{ github.event.inputs.environment }}.tfvars" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="container_image=${{ secrets.AWS_ECR_REPOSITORY }}:${{ github.event.inputs.image_tag }}"
+      - name: Terraform apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: infra/aws/terraform
+        run: |
+          terraform apply -auto-approve \
+            -var-file="env/${{ github.event.inputs.environment }}.tfvars" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="container_image=${{ secrets.AWS_ECR_REPOSITORY }}:${{ github.event.inputs.image_tag }}"
+

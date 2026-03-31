@@ -6,11 +6,14 @@ import pandas as pd
 import uvicorn
 from fastapi import FastAPI
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from vbc_claims.analytics.reporting import build_bundle_episode_report
 from vbc_claims.api.schemas import AssignEpisodesRequest, AssignEpisodesResponse
 from vbc_claims.episodes.engine import assign_episodes_for_all_members
+from vbc_claims.config import settings
 from vbc_claims.io.db import db_connection
+from vbc_claims.observability import configure_logging
 from vbc_claims.quality.checks import run_reconciliation_report
 from vbc_claims.transforms.member_months import build_member_months
 
@@ -23,7 +26,17 @@ app = FastAPI(
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    return {"status": "ok", "service": "vbc-claims-api"}
+    return {"status": "ok", "service": "vbc-claims-api", "env": settings.app_env}
+
+
+@app.get("/ready")
+def readiness() -> dict[str, object]:
+    try:
+        with db_connection() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"ready": True, "database": "ok"}
+    except SQLAlchemyError as exc:
+        return {"ready": False, "database": f"error: {exc}"}
 
 
 @app.get("/episodes/catalog")
@@ -89,6 +102,7 @@ def report_bundles(month: str = "2025-12") -> dict[str, object]:
 
 
 def run() -> None:
+    configure_logging()
     uvicorn.run("vbc_claims.api.main:app", host="0.0.0.0", port=8001, reload=False)
 
 

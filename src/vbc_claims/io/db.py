@@ -9,7 +9,7 @@ from vbc_claims.config import settings
 
 
 def get_engine() -> Engine:
-    return create_engine(settings.database_url, pool_pre_ping=True)
+    return create_engine(settings.resolved_database_url(), pool_pre_ping=True)
 
 
 @contextmanager

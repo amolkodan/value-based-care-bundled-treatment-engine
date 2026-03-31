@@ -20,14 +20,12 @@ services:
   api:
     build:
       context: .
-      dockerfile_inline: |
-        FROM python:3.11-slim
-        WORKDIR /app
-        COPY . /app
-        RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir -e .
-        CMD ["vbc-claims-api"]
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+psycopg2://vbc:vbc@postgres:5432/vbc_claims
+      APP_ENV: local
+      LOG_JSON: "false"
+      MIGRATE_ON_STARTUP: "false"
     ports:
       - "8001:8001"
     depends_on:
